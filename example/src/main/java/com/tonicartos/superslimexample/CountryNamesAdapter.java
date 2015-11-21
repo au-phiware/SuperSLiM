@@ -1,4 +1,7 @@
+// 2015-11-22: Modified by Corin Lawson <corin@phiware.com.au> (@au-phiware)
 package com.tonicartos.superslimexample;
+
+import static java.util.Arrays.copyOfRange;
 
 import com.tonicartos.superslim.GridSLM;
 import com.tonicartos.superslim.LayoutManager;
@@ -18,8 +21,7 @@ import java.util.List;
 /**
  *
  */
-public class CountryNamesAdapter extends RecyclerView.Adapter<CountryViewHolder>
-        implements SectionAdapter<CountryNamesAdapter.Section> {
+public class CountryNamesAdapter extends SectionAdapter<CountryViewHolder> {
 
     private static final int VIEW_TYPE_HEADER = 0x01;
 
@@ -27,57 +29,50 @@ public class CountryNamesAdapter extends RecyclerView.Adapter<CountryViewHolder>
 
     private static final int LINEAR = 0;
 
-    private final Section mSectionGraph = new Section();
-
     private int mHeaderDisplay;
 
     private boolean mMarginsFixed;
 
     private final Context mContext;
 
+    private int sectionCount = 0;
+    private String[][] countryNames = new String[26][];
+
     public CountryNamesAdapter(Context context, int headerMode) {
         mContext = context;
 
-        final String[] countryNames = context.getResources().getStringArray(R.array.country_names);
+        final String[] _countryNames = context.getResources().getStringArray(R.array.country_names);
         mHeaderDisplay = headerMode;
 
-        //Insert headers into list of items.
         String lastHeaderText = "";
         int sectionManager = -1;
-        int headerCount = 0;
         int sectionFirstPosition = 0;
-        Section currentSection = new Section();
-        for (int i = 0; i < countryNames.length; i++) {
-            String headerText = countryNames[i].substring(0, 1);
+        int i;
+        for (i = 0; i < _countryNames.length; i++) {
+            String headerText = _countryNames[i].substring(0, 1);
             if (!TextUtils.equals(lastHeaderText, headerText)) {
-                // Insert new header view and update section data.
-                sectionManager = (sectionManager + 1) % 2;
-                sectionFirstPosition = i + headerCount;
+                if (lastHeaderText.length() > 0) {
+                    countryNames[sectionCount++] = copyOfRange(_countryNames, sectionFirstPosition, i);
+                }
+                sectionFirstPosition = i;
                 lastHeaderText = headerText;
-                headerCount += 1;
-                currentSection.setEnd(sectionFirstPosition - 1);
-                currentSection = new Section(sectionFirstPosition);
-                currentSection.addHeader(
-                        new LineItem(headerText, true, sectionManager, sectionFirstPosition));
-                mSectionGraph.addSubsection(currentSection);
             }
-            currentSection.addItem(
-                    new LineItem(countryNames[i], false, sectionManager, sectionFirstPosition));
         }
-        currentSection.setEnd(mSectionGraph.getCount());
+        countryNames[sectionCount++] = copyOfRange(_countryNames, sectionFirstPosition, i);
     }
 
     @Override
-    public List<Section> getSections() {
-        return mSectionGraph.getSubsections();
+    public int getItemCount(int... path) {
+        if (path.length == 1)
+            return countryNames[path[0]].length + 1;
+        return 0;
     }
 
-    public boolean isItemHeader(int position) {
-        return mSectionGraph.getItem(position).isHeader;
-    }
-
-    public String itemToString(int position) {
-        return mSectionGraph.getItem(position).text;
+    @Override
+    public int getSectionCount(int... path) {
+        if (path.length == 0)
+            return sectionCount;
+        return 0;
     }
 
     @Override
@@ -93,17 +88,35 @@ public class CountryNamesAdapter extends RecyclerView.Adapter<CountryViewHolder>
         return new CountryViewHolder(view);
     }
 
+    public String itemToString(int... path) {
+        if (path.length == 2) {
+            if (path[1] == 0) {
+                return countryNames[path[0]][0].substring(0, 1);
+            } else {
+                return countryNames[path[0]][path[1] - 1];
+            }
+        }
+        return "";
+    }
+
+    public String itemToString(int position) {
+        return itemToString(getPath(position));
+    }
+
     @Override
-    public void onBindViewHolder(CountryViewHolder holder, int position) {
-        final LineItem item = mSectionGraph.getItem(position);
+    public void onBindViewHolder(CountryViewHolder holder, int... path) {
         final View itemView = holder.itemView;
 
-        holder.bindItem(item.text);
+        if (path[1] == 0) {
+            holder.bindItem(countryNames[path[0]][0].substring(0, 1));
+        } else {
+            holder.bindItem(countryNames[path[0]][path[1] - 1]);
+        }
 
         final GridSLM.LayoutParams lp = new GridSLM.LayoutParams(
                 itemView.getLayoutParams());
         // Overrides xml attrs, could use different layouts too.
-        if (item.isHeader) {
+        if (path[1] == 0) {
             lp.headerDisplay = mHeaderDisplay;
             if (lp.isHeaderInline() || (mMarginsFixed && !lp.isHeaderOverlay())) {
                 lp.width = ViewGroup.LayoutParams.MATCH_PARENT;
@@ -112,8 +125,8 @@ public class CountryNamesAdapter extends RecyclerView.Adapter<CountryViewHolder>
             }
         }
 
-        if (position == item.sectionFirstPosition) {
-            lp.setSlm(item.sectionManager == LINEAR ? LinearSLM.ID : GridSLM.ID);
+        if (path[1] == 0) {
+            lp.setSlm(LinearSLM.ID);
             lp.marginEnd = mMarginsFixed ? mContext.getResources()
                     .getDimensionPixelSize(R.dimen.default_section_marginEnd)
                     : LayoutManager.LayoutParams.MARGIN_AUTO;
@@ -127,13 +140,12 @@ public class CountryNamesAdapter extends RecyclerView.Adapter<CountryViewHolder>
     }
 
     @Override
-    public int getItemViewType(int position) {
-        return mSectionGraph.getItem(position).isHeader ? VIEW_TYPE_HEADER : VIEW_TYPE_CONTENT;
+    public int getItemViewType(int... path) {
+        return path[1] == 0 ? VIEW_TYPE_HEADER : VIEW_TYPE_CONTENT;
     }
 
-    @Override
-    public int getItemCount() {
-        return mSectionGraph.getCount();
+    public boolean isItemHeader(int position) {
+        return getItemViewType(position) == VIEW_TYPE_HEADER;
     }
 
     public void setHeaderDisplay(int headerDisplay) {
@@ -147,96 +159,8 @@ public class CountryNamesAdapter extends RecyclerView.Adapter<CountryViewHolder>
     }
 
     private void notifyHeaderChanges() {
-        final int count = mSectionGraph.getCount();
-        for (int i = 0; i < count; i++) {
-            final LineItem item = mSectionGraph.getItem(i);
-            if (item.isHeader) {
-                notifyItemChanged(i);
-            }
-        }
-    }
-
-    private static class LineItem {
-
-        public int sectionManager;
-
-        public int sectionFirstPosition;
-
-        public boolean isHeader;
-
-        public String text;
-
-        public LineItem(String text, boolean isHeader, int sectionManager,
-                int sectionFirstPosition) {
-            this.isHeader = isHeader;
-            this.text = text;
-            this.sectionManager = sectionManager;
-            this.sectionFirstPosition = sectionFirstPosition;
-        }
-    }
-
-    public static class Section extends SectionAdapter.Section<Section> {
-
-        private ArrayList<LineItem> mItems = new ArrayList<>();
-
-        private LineItem mHeader;
-
-        public Section() {
-        }
-
-        public Section(int start) {
-            super(start);
-        }
-
-        public Section addHeader(LineItem header) {
-            mHeader = header;
-            return this;
-        }
-
-        public Section addItem(LineItem item) {
-            mItems.add(item);
-            return this;
-        }
-
-        public Section addSubsection(Section section) {
-            if (subsections == null) {
-                subsections = new ArrayList<>();
-            }
-            subsections.add(section);
-            return this;
-        }
-
-        public int getCount() {
-            int sum = mHeader == null ? 0 : 1;
-            if (subsections != null && subsections.size() != 0) {
-                for (Section sub : subsections) {
-                    sum += sub.getCount();
-                }
-            } else {
-                sum += mItems.size();
-            }
-
-            return sum;
-        }
-
-        public LineItem getItem(int position) {
-            if (mHeader != null && position == start) {
-                return mHeader;
-            }
-
-            if (subsections != null) {
-                for (Section sub : subsections) {
-                    if (sub.contains(position)) {
-                        return sub.getItem(position);
-                    }
-                }
-            }
-
-            return mItems.get(position - start - (mHeader != null ? 1 : 0));
-        }
-
-        private boolean contains(int position) {
-            return start <= position && position <= end;
+        for (int i = 0; i < sectionCount; i++) {
+            notifyItemChanged(i, 0);
         }
     }
 }

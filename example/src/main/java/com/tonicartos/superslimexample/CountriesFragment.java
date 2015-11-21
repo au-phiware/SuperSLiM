@@ -1,3 +1,4 @@
+// 2015-11-22: Modified by Corin Lawson <corin@phiware.com.au> (@au-phiware)
 package com.tonicartos.superslimexample;
 
 import android.os.Bundle;
@@ -93,7 +94,6 @@ public class CountriesFragment extends Fragment {
 
         mAdapter = new CountryNamesAdapter(getActivity(), mHeaderDisplay);
         LayoutManager layoutManager = new LayoutManager.Builder(getActivity())
-                .addAdapter(mAdapter)
                 .build();
         mRecyclerView.setLayoutManager(layoutManager);
 
