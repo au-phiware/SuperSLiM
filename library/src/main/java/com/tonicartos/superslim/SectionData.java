@@ -1,3 +1,4 @@
+// 2015-11-21: Modified by Corin Lawson <corin@phiware.com.au> (@au-phiware)
 package com.tonicartos.superslim;
 
 import android.support.v7.widget.RecyclerView;
@@ -40,35 +41,9 @@ public class SectionData {
 
     private int mTempHeaderIndex;
 
-    private SectionData(int firstPosition, int lastPosition) {
+    SectionData(int firstPosition, int lastPosition) {
         this.firstPosition = firstPosition;
         this.lastPosition = lastPosition;
-    }
-
-    static ArrayList<SectionData> processSectionGraph(int lastPosition,
-            List<? extends SectionAdapter.Section> sections) {
-        if (sections == null || sections.size() == 0) {
-            return null;
-        }
-
-        ArrayList<SectionData> sectionData = new ArrayList<>();
-        for (int i = sections.size() - 1; i >= 0; i--) {
-            SectionAdapter.Section s = sections.get(i);
-            if (s.end != SectionAdapter.Section.NO_POSITION) {
-                // Doing this will allow intermingling subsections and items.
-                lastPosition = s.end;
-            }
-
-            SectionData sd = new SectionData(s.start, lastPosition);
-            sd.subsections = processSectionGraph(sd.lastPosition, s.getSubsections());
-            sd.slmConfig = s.getSlmConfig();
-            sectionData.add(0, sd);
-
-            // Prime for next iteration.
-            lastPosition = sd.firstPosition - 1;
-        }
-
-        return sectionData;
     }
 
     public void clearTempHeaderIndex() {

@@ -1,3 +1,4 @@
+// 2015-11-21: Modified by Corin Lawson <corin@phiware.com.au> (@au-phiware)
 package com.tonicartos.superslim;
 
 import android.annotation.TargetApi;
@@ -25,7 +26,7 @@ import android.widget.TextView;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
-import java.util.ArrayList;
+import java.util.List;
 import java.util.HashMap;
 
 /**
@@ -64,7 +65,7 @@ public class LayoutManager extends RecyclerView.LayoutManager {
 
     private LayoutHelper.Parent mHelperDelegate;
 
-    private ArrayList<SectionData> mSections;
+    private SectionAdapter adapter;
 
     public LayoutManager(Context context) {
         mLinearSlm = new LinearSLM();
@@ -79,9 +80,6 @@ public class LayoutManager extends RecyclerView.LayoutManager {
         mLinearSlm = new LinearSLM();
         mGridSlm = new GridSLM(builder.context);
         mSlms = builder.slms;
-        SectionAdapter sectionAdapter = (SectionAdapter) builder.adapter;
-        mSections = SectionData.processSectionGraph(
-                builder.adapter.getItemCount(), sectionAdapter.getSections());
         mHelperDelegate = new LayoutHelperDelegate(this);
     }
 
@@ -283,12 +281,12 @@ public class LayoutManager extends RecyclerView.LayoutManager {
     }
 
     public SectionData getSectionData(int position) {
-        for (SectionData sd : mSections) {
-            if (sd.containsItem(position)) {
-                return sd;
-            }
-        }
-        throw new MissingSectionDataRuntimeException(position);
+        if (adapter == null)
+            throw new MissingSectionDataRuntimeException(position);
+        SectionData data = adapter.getSectionData(position);
+        if (data == null)
+            throw new MissingSectionDataRuntimeException(position);
+        return data;
     }
 
     @Override
@@ -303,40 +301,32 @@ public class LayoutManager extends RecyclerView.LayoutManager {
     public void onAdapterChanged(RecyclerView.Adapter oldAdapter, RecyclerView.Adapter newAdapter) {
         removeAllViews();
 
-        if (!(newAdapter instanceof SectionAdapter)) {
-            throw new SectionAdapterNotImplementedRuntimeException();
+        if (newAdapter == null || !(newAdapter instanceof SectionAdapter)) {
+            this.adapter = null;
         }
-        SectionAdapter sectionAdapter = (SectionAdapter) newAdapter;
-        //noinspection unchecked
-        mSections = SectionData.processSectionGraph(
-                newAdapter.getItemCount(), sectionAdapter.getSections());
-    }
-
-    @Override
-    public void onItemsChanged(RecyclerView recyclerView) {
-        super.onItemsChanged(recyclerView);
-
-        RecyclerView.Adapter adapter = recyclerView.getAdapter();
-        if (!(adapter instanceof SectionAdapter)) {
-            throw new SectionAdapterNotImplementedRuntimeException();
-        }
-        SectionAdapter sectionAdapter = (SectionAdapter) adapter;
-        //noinspection unchecked
-        mSections = SectionData.processSectionGraph(
-                adapter.getItemCount(), sectionAdapter.getSections());
+        this.adapter = (SectionAdapter) newAdapter;
     }
 
     @Override
     public void onItemsUpdated(RecyclerView recyclerView, int positionStart, int itemCount) {
         super.onItemsUpdated(recyclerView, positionStart, itemCount);
 
+        /*
         for (SectionData sd : mSections) {
+            //TODO: SectionData should be the responsibility of SectionAdapter, hence the adapter will have been already notified
             sd.updateInitStatus(positionStart, itemCount);
+            //FIXME: Why is *all* configuration data being cleared??
             mLinearSlm.clearConfigurationForSection(sd);
             mGridSlm.clearConfigurationForSection(sd);
             for (SectionLayoutManager slm : mSlms.values()) {
                 slm.clearConfigurationForSection(sd);
             }
+        }
+        */
+        mLinearSlm.reset();
+        mGridSlm.reset();
+        for (SectionLayoutManager slm : mSlms.values()) {
+            slm.reset();
         }
 
         View first = getChildAt(0);
@@ -1083,7 +1073,8 @@ public class LayoutManager extends RecyclerView.LayoutManager {
      * Layout views from the top.
      *
      * @param anchorPosition Position to start laying out from.
-     * @param recycler       Layout state.  @return Line to which content has been filled. If the
+     * @param recycler       Layout state.
+     * @return Line to which content has been filled. If the
      *                       line is before the leading edge then the end of the data set has been
      */
     private int layoutChildren(int anchorPosition, int borderLine, Recycler recycler,
@@ -1092,7 +1083,7 @@ public class LayoutManager extends RecyclerView.LayoutManager {
         final int bottom = getHeight();
         final int top = 0;
 
-        if (mSections == null) {
+        if (adapter == null || adapter.getItemCount() == 0) {
             return 0;
         }
 
@@ -1281,18 +1272,8 @@ public class LayoutManager extends RecyclerView.LayoutManager {
 
         HashMap<String, SectionLayoutManager> slms = new HashMap<>();
 
-        RecyclerView.Adapter adapter;
-
         public Builder(Context context) {
             this.context = context;
-        }
-
-        public Builder addAdapter(RecyclerView.Adapter adapter) {
-            if (!(adapter instanceof SectionAdapter)) {
-                throw new SectionAdapterNotImplementedRuntimeException();
-            }
-            this.adapter = adapter;
-            return this;
         }
 
         public Builder addSlm(String key, SectionLayoutManager slm) {

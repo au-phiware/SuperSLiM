@@ -1,82 +1,237 @@
+// 2015-11-21: Modified by Corin Lawson <corin@phiware.com.au> (@au-phiware)
 package com.tonicartos.superslim;
 
-import java.util.ArrayList;
-import java.util.List;
+import static java.util.Arrays.copyOf;
+import static java.util.Arrays.copyOfRange;
 
-public interface SectionAdapter<T extends SectionAdapter.Section> {
+import android.support.v7.widget.RecyclerView;
 
-    List<T> getSections();
+public abstract class SectionAdapter<VH extends RecyclerView.ViewHolder> extends RecyclerView.Adapter<VH> {
+    public static int NO_POSITION = -1;
 
-    public abstract class Section<T extends Section> {
+    Node root = new Node();
 
-        static final int NO_POSITION = -1;
+    public SectionAdapter() {
+        super();
+        registerAdapterDataObserver(new Observer());
+    }
 
-        public int end = NO_POSITION;
-
-        public int start;
-
-        public List<T> subsections;
-
-        public SectionLayoutManager.SlmConfig slmConfig;
-
-        public Section() {
-
+    class Observer extends RecyclerView.AdapterDataObserver {
+        public void onChanged() {
+            root.data = null;
+            root.children = null;
+            root.totalItemCount = -1;
+            root.itemCount = -1;
         }
 
-        public Section(int start) {
-            this(start, NO_POSITION);
+        public void onItemRangeChanged(int positionStart, int itemCount) {
+            //TODO: find closest node to positionStart and clear it and everything afterwards
+            onChanged();
         }
 
-        public Section(int start, int end) {
-            this(start, end, null);
+        public void onItemRangeChanged(int positionStart, int itemCount, Object payload) {
+            onItemRangeChanged(positionStart, itemCount);
         }
 
-        public Section(int start, int end, List<T> subsections) {
-            this(start, end, subsections, null);
+        public void onItemRangeInserted(int positionStart, int itemCount) {
+            // Unable to tell if itemCount spans multiple sections.
+            onItemRangeChanged(positionStart, itemCount);
         }
 
-        public Section(int start, int end, List<T> subsections,
-                SectionLayoutManager.SlmConfig config) {
-            this.start = start;
-            this.end = end;
-            this.subsections = subsections;
-            this.slmConfig = config;
+        public void onItemRangeMoved(int fromPosition, int toPosition, int itemCount) {
+            //TODO: find closest node to earliest position and invalidate everything inbetween
+            onChanged();
         }
 
-        public int getEnd() {
-            return end;
+        public void onItemRangeRemoved(int positionStart, int itemCount) {
+            //TODO: find closest node(s) to positionStart and invalidate it and then adjust the counts
+            onChanged();
+        }
+    }
+
+    class Cursor {
+        Node node; int[] path; int position;
+
+        Cursor(Node n, int[] p, int po) {
+            node = n;
+            path = p;
+            position = po;
         }
 
-        public Section setEnd(int end) {
-            this.end = end;
-            return this;
+        SectionData getSectionData() {
+            if (node.data == null) {
+                int i = path[path.length - 1];
+                int start = position - i;
+                int end = start + node.getTotalItemCount(copyOf(path, path.length - 1)) - 1;
+                node.data = new SectionData(start, end);
+            }
+            return node.data;
         }
 
-        public SectionLayoutManager.SlmConfig getSlmConfig() {
+        int getItemCount() {
+            if (node.itemCount < 0) {
+                node.itemCount = SectionAdapter.this.getItemCount(path);
+            }
+            return node.itemCount;
+        }
+
+        int getTotalItemCount() {
+            return node.getTotalItemCount(path);
+        }
+
+        void descend(int index) {
+            if (node.children == null) {
+                int count = getSectionCount(path);
+                node.children = new SectionAdapter.Node[count];
+            }
+            position += getItemCount();
+            int last = path.length;
+            int[] childPath = copyOf(path, last + 1);
+            for (int i = 0; i < index; i++) {
+                childPath[last] = i;
+                if (node.children[i] == null) {
+                    node.children[i] = new Node();
+                }
+                position += node.children[i].getTotalItemCount(childPath);
+            }
+            if (node.children[index] == null) {
+                node.children[index] = new Node();
+            }
+            node = node.children[index];
+            path = childPath;
+            path[path.length - 1] = index;
+        }
+    }
+
+    class Node {
+        SectionData data;
+        int totalItemCount = -1;
+        int itemCount = -1;
+        Node[] children;
+
+        int getTotalItemCount(int... path) {
+            if (totalItemCount < 0) {
+                if (itemCount < 0) {
+                    itemCount = getItemCount(path);
+                }
+                totalItemCount = itemCount;
+                int count;
+                if (children == null) {
+                    count = getSectionCount(path);
+                    children = new SectionAdapter.Node[count];
+                } else {
+                    count = children.length;
+                }
+                int last = path.length;
+                int[] childPath = copyOf(path, last + 1);
+                for (int i = 0; i < count; i++) {
+                    childPath[last] = i;
+                    if (children[i] == null) {
+                        children[i] = new Node();
+                    }
+                    totalItemCount += children[i].getTotalItemCount(childPath);
+                }
+            }
+            return totalItemCount;
+        }
+
+        Cursor getPath(int position, int... path) {
+            if (position < 0) {
+                return null;
+            }
+            int last = path.length;
+            int[] childPath = copyOf(path, last + 1);
+            if (itemCount < 0) {
+                itemCount = getItemCount(path);
+            }
+            if (itemCount > 0 && position < itemCount) {
+                childPath[last] = position;
+                return new Cursor(this, childPath, position);
+            }
+            if (totalItemCount >= 0 && position >= totalItemCount) {
+                return null;
+            }
+            int total = itemCount;
+            int childCount;
+            if (children == null) {
+                childCount = getSectionCount(path);
+                children = new SectionAdapter.Node[childCount];
+            } else {
+                childCount = children.length;
+            }
+            Cursor cursor;
+            for (int i = 0; i < childCount; i++) {
+                childPath[last] = i;
+                if (children[i] == null) {
+                    children[i] = new Node();
+                }
+                cursor = children[i].getPath(position - total, childPath);
+                if (cursor != null) {
+                    cursor.position += total;
+                    return cursor;
+                }
+                total += children[i].totalItemCount;
+            }
+            totalItemCount = total;
             return null;
         }
+    }
 
-        public Section setSlmConfig(SectionLayoutManager.SlmConfig config) {
-            slmConfig = config;
-            return this;
-        }
+    public SectionData getSectionData(int position) {
+        Cursor cursor = root.getPath(position);
+        if (cursor != null)
+            return cursor.getSectionData();
+        return null;
+    }
 
-        public int getStart() {
-            return start;
-        }
+    public int[] getPath(int position) {
+        Cursor cursor = root.getPath(position);
+        if (cursor != null)
+            return cursor.path;
+        return null;
+    }
 
-        public Section setStart(int start) {
-            this.start = start;
-            return this;
-        }
+    public void onBindViewHolder(VH holder, int position) {
+        Cursor cursor = root.getPath(position);
+        if (cursor != null)
+            onBindViewHolder(holder, cursor.path);
+    }
 
-        public List<T> getSubsections() {
-            return subsections;
-        }
+    public abstract int getSectionCount(int... indexPath);
+    public abstract int getItemCount(int... indexPath);
+    public abstract int getItemViewType(int... indexPath);
+    public abstract void onBindViewHolder(VH holder, int... indexPathToItem);
 
-        public Section setSubsections(List<T> subsections) {
-            this.subsections = subsections;
-            return this;
+    public final void notifyItemChanged(int... path) {
+        if (path.length > 0) {
+            super.notifyItemChanged(getPosition(path));
         }
+    }
+
+    public int getPosition(int... indexPath) {
+        if (indexPath.length > 0) {
+            int i = 0;
+            Cursor cursor = new Cursor(root, new int[0], 0);
+            while (i < indexPath.length - 1) {
+                cursor.descend(indexPath[i++]);
+            }
+            return cursor.position + indexPath[i];
+        }
+        return 0;
+    }
+
+    /**
+     * Default implementation walks the section graph, collecting the values that are returned from getItemCount(int[])
+     */
+    public int getItemCount() {
+        return root.getTotalItemCount();
+    }
+
+    @Override
+    public int getItemViewType(int position) {
+        Cursor cursor = root.getPath(position);
+        if (cursor != null)
+            return getItemViewType(cursor.path);
+        return -1;
     }
 }
