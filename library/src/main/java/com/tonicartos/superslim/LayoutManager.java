@@ -1,6 +1,8 @@
 // 2015-11-21: Modified by Corin Lawson <corin@phiware.com.au> (@au-phiware)
 package com.tonicartos.superslim;
 
+import static java.lang.String.format;
+
 import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.res.TypedArray;
@@ -34,6 +36,7 @@ import java.util.HashMap;
  * sections to view layout managers to layout items.
  */
 public class LayoutManager extends RecyclerView.LayoutManager {
+    private final static String TAG = "LayoutManager";
 
     final static int DIRECTION_END = 0;
 
@@ -330,6 +333,7 @@ public class LayoutManager extends RecyclerView.LayoutManager {
         }
 
         View first = getChildAt(0);
+        if (first == null) return; //FIXME
         int count = getChildCount();
         View last = getChildAt(count - 1);
         if (positionStart + itemCount <= getPosition(first)) {
@@ -1079,7 +1083,7 @@ public class LayoutManager extends RecyclerView.LayoutManager {
      */
     private int layoutChildren(int anchorPosition, int borderLine, Recycler recycler,
             RecyclerView.State state) {
-        Log.d("layout", "start");
+        Log.d(TAG, format("Enter layoutChildren(%d, %d, ...)", anchorPosition, borderLine));
         final int bottom = getHeight();
         final int top = 0;
 
@@ -1685,7 +1689,9 @@ public class LayoutManager extends RecyclerView.LayoutManager {
 
         @Override
         public int getPosition(View child) {
-            return mLayoutManager.getPosition(child);
+            if (child != null)
+                return mLayoutManager.getPosition(child);
+            return -1;
         }
 
         @Override

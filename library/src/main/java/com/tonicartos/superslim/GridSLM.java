@@ -148,6 +148,7 @@ public class GridSLM extends SectionLayoutManager {
         // Look from end to find children that are the lowest.
         for (int i = lastIndex; i >= 0; i--) {
             View look = helper.getChildAt(i);
+            if (look == null) continue; //FIXME;
             LayoutManager.LayoutParams params = (LayoutManager.LayoutParams) look.getLayoutParams();
             if (!sectionData.containsItem(params.getViewPosition())) {
                 break;
@@ -300,6 +301,7 @@ public class GridSLM extends SectionLayoutManager {
             // child view in the index can be the header so we just skip past it if it last.
             for (int j = 1; j <= helper.getChildCount(); j++) {
                 View child = helper.getChildAt(helper.getChildCount() - j);
+                if (child == null) continue; //FIXME;
                 if (helper.getPosition(child) == anchorPosition - i) {
                     markerLine = helper.getTop(child);
                     helper.detachAndScrapViewAt(j, recycler);
@@ -350,6 +352,7 @@ public class GridSLM extends SectionLayoutManager {
         boolean applyMinHeight = false;
         for (int i = 0; i < helper.getChildCount(); i++) {
             View check = helper.getChildAt(0);
+            if (check == null) continue; //FIXME;
             LayoutManager.LayoutParams checkParams =
                     (LayoutManager.LayoutParams) check.getLayoutParams();
             if (!sd.containsItem(checkParams.getViewPosition())) {
@@ -371,6 +374,7 @@ public class GridSLM extends SectionLayoutManager {
             // child view in the index can be the header so we just skip past it if it last.
             for (int j = 0; j < helper.getChildCount(); j++) {
                 View child = helper.getChildAt(j);
+                if (child == null) continue; //FIXME;
                 if (!sd.containsItem(helper.getPosition(child))) {
                     break;
                 }

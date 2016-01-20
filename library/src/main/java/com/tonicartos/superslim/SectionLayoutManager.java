@@ -223,6 +223,7 @@ public abstract class SectionLayoutManager {
         // Look from start to find children that are the highest.
         for (int i = firstIndex; i < helper.getChildCount(); i++) {
             View child = helper.getChildAt(i);
+            if (child == null) break; //FIXME
             LayoutManager.LayoutParams params = (LayoutManager.LayoutParams) child
                     .getLayoutParams();
             if (!sectionData.containsItem(params.getViewPosition())) {
@@ -251,6 +252,7 @@ public abstract class SectionLayoutManager {
         // Look from end to find children that are the lowest.
         for (int i = lastIndex; i >= 0; i--) {
             View child = helper.getChildAt(i);
+            if (child == null) break; //FIXME
             LayoutManager.LayoutParams params = (LayoutManager.LayoutParams) child
                     .getLayoutParams();
             if (!sectionData.containsItem(params.getViewPosition())) {
@@ -496,6 +498,7 @@ public abstract class SectionLayoutManager {
         for (int i = 0; i < range; i++) {
             int childIndex = lastVisibleIndex - i;
             View child = helper.getChildAt(childIndex);
+            if (child == null) continue; //FIXME
             if (endEdge < helper.getBottom(child)) {
                 int childPosition = helper.getPosition(child);
                 for (SectionData subSd : sd.subsections) {
@@ -545,6 +548,7 @@ public abstract class SectionLayoutManager {
         for (int i = 0; i < range; i++) {
             int childIndex = i + firstVisibleIndex;
             View child = helper.getChildAt(childIndex);
+            if (child == null) continue; //FIXME
             if (helper.getTop(child) < startEdge) {
                 int childPosition = helper.getPosition(child);
                 for (SectionData subSd : sd.subsections) {
@@ -577,6 +581,7 @@ public abstract class SectionLayoutManager {
         }
 
         final View header = helper.getChildAt(headerIndex);
+        if (header == null) return stickyEdge; //FIXME
         final LayoutManager.LayoutParams headerParams =
                 (LayoutManager.LayoutParams) header.getLayoutParams();
         if (!headerParams.isHeaderSticky()) {

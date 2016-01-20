@@ -146,7 +146,9 @@ class LayoutHelperImpl extends LayoutHelper implements LayoutHelper.Parent, Layo
 
     @Override
     public int getPosition(View child) {
-        return mParent.getPosition(child);
+        if (child != null)
+            return mParent.getPosition(child);
+        return -1;
     }
 
     @Override
